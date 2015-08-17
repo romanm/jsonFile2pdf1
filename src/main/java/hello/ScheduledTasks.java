@@ -30,7 +30,6 @@ import org.dom4j.Attribute;
 import org.dom4j.Document;
 import org.dom4j.DocumentHelper;
 import org.dom4j.Element;
-import org.dom4j.Node;
 import org.dom4j.dom.DOMDocument;
 import org.dom4j.dom.DOMDocumentFactory;
 import org.dom4j.dom.DOMElement;
@@ -94,7 +93,7 @@ public class ScheduledTasks {
 	}
 
 	private Element bookmarks;
-			private int bookmarkId;
+	private int bookmarkId;
 	private void makeLargeHTML() throws IOException {
 		logger.debug("Start folder : "+dirJsonStart);
 		Files.walkFileTree(dirJsonStart, new SimpleFileVisitor<Path>() {
@@ -112,7 +111,7 @@ public class ScheduledTasks {
 				String autoName = (String) jsonMap.get("autoName");
 				String autoNameWithManufacturer = manufacturerName+"_-_"+autoName;
 				//				String autoNameWithManufacturer = manufacturerName+ " :: "+autoName;
-				logger.debug(autoNameWithManufacturer);
+				logger.debug(autoNameWithManufacturer +" -- BEGIN");
 
 				Element autoDocBody = createAutoDocument(autoNameWithManufacturer);
 				autoTileNr = 0;
@@ -124,6 +123,7 @@ public class ScheduledTasks {
 				//buildBookmark(autoDocument);
 				
 				addGroupAndRealInfo(bookmarks, getIndexList(jsonMap));
+				logger.debug(autoNameWithManufacturer +" -- GOTO SAVE");
 				
 				try{
 					String htmlOutFileName = dirLargeHtmlName+autoNameWithManufacturer+".html";
@@ -131,6 +131,7 @@ public class ScheduledTasks {
 				}catch(Exception e){
 					e.printStackTrace();
 				}
+				logger.debug(autoNameWithManufacturer +" -- END");
 				return visitFile;
 			}
 
@@ -238,96 +239,95 @@ public class ScheduledTasks {
 	}
 //	private String addAutoTile(int autoTileNr, String autoTileName, Document domFromStream  ) {
 	private void addAutoTile(Document domFromStream) {
-		DOMElement autoTileElement = (DOMElement) domFromStream.selectSingleNode("/html/body//div[@id='page1-div']");
+		DOMElement autoTileElement1 = (DOMElement) domFromStream.selectSingleNode("/html/body//div[@id='page1-div']");
+		Element autoTileElement = autoTileElement1;
 		if(autoTileElement != null){
 			autoTileElement.attribute("id").setValue("auto_tile_"+autoTileNr);
 			changeImgUrl(autoTileElement);
+			addBreadcrumbBefore(autoTileElement1);
+			cleanSymbols(autoTileElement);
+			
+			Element detach = (Element) autoTileElement.detach();
+			autoDocBody.add(detach);
 		}else{
 			//audi
-			Element autoTileElement2 = (Element) domFromStream.selectSingleNode(
+			Element autoTileElementFromStream = (Element) domFromStream.selectSingleNode(
 					"/html/body/div/table//td[div/h2]");
-			changeImgUrl(autoTileElement2);
+			changeImgUrl(autoTileElementFromStream);
 			/*
 			Element autoTileNameElement = (Element) autoTileElement2.selectSingleNode("div/h2");
 			autoTileNameElement.setText(autoTileName);
 			 * */
 			
 			/*
-			List<Element> breadcrum = autoTileElement2.selectNodes("div/h3");
-			for (Element element : breadcrum) {
+			 * */
+			List<Element> breadcrumOld = autoTileElementFromStream.selectNodes("div/h3");
+			for (Element element : breadcrumOld) {
 				element.detach();
 			}
-			 * */
-			autoTileElement = (DOMElement) autoDocBody.addElement("div");
+			autoTileElement = autoDocBody.addElement("div");
 			autoTileElement.addAttribute("id","auto_tile_"+autoTileNr);
-			
-			for (Iterator iterator = autoTileElement2.elementIterator(); iterator.hasNext();) {
+			addBreadcrumb(autoTileElement);
+
+			cleanSymbols(autoTileElementFromStream);
+			for (Iterator iterator = autoTileElementFromStream.elementIterator(); iterator.hasNext();) {
 				Element element = (Element) iterator.next();
 				autoTileElement.add(element.detach());
 			}
+
 		}
 		/* neccesary
 		 * */
+	}
+	private void cleanSymbols(Element autoTileElement) {
 		List<Element> selectNodes = autoTileElement.selectNodes(".//*[text()]");
 		for (Element element : selectNodes) {
 			String replace = element.getText().replace("‘", "'").replace("’", "'");
 			element.setText(replace);
 		}
-		addBreadcrumb(autoTileElement);
-		Element detach = (Element) autoTileElement.detach();
-		Node selectSingleNode = detach.selectSingleNode("img");
-		if(selectSingleNode != null)
-		{
-			logger.debug(selectSingleNode.asXML());
-			debugSkip++;
-			autoDocBody.add(detach);
-		}
 	}
-	private void addBreadcrumb(DOMElement autoTileElement) {
-		DOMDocument document = (DOMDocument) autoTileElement.getDocument();
-		DOMElement h3El = (DOMElement) document.createElement("div");
-		h3El.addAttribute("style", "font-weight: bold; left: 0px; position: absolute; top: 3px; font-size:x-small;");
-		//		.addElement("a").addAttribute("name", "h3_"+autoTileNr)
+	private void addBreadcrumb(Element autoTileElement) {
+		Element breadcrumbEl = autoTileElement.addElement("div");
+//		breadcrumbEl.addAttribute("style", "font-weight: bold; left: 0px; position: absolute; top: 3px; font-size:x-small;");
+		breadcrumbEl.addAttribute("style", "font-size:x-small;");
 		Element lastChildElement = (Element) bookmarks.selectSingleNode("*[last()]");
-		addBreadcrumbItem(lastChildElement, h3El);
+		addBreadcrumbItem(lastChildElement, breadcrumbEl);
+	}
+	private void addBreadcrumbBefore(DOMElement autoTileElement) {
+		DOMDocument document = (DOMDocument) autoTileElement.getDocument();
+		DOMElement breadcrumbEl = (DOMElement) document.createElement("div");
+//		breadcrumbEl.addAttribute("style", "font-weight: bold; left: 0px; position: absolute; top: 3px; font-size:x-small;");
+		breadcrumbEl.addAttribute("style", "left: 0px; position: absolute; top: 3px; font-size:x-small;");
+		Element lastChildElement = (Element) bookmarks.selectSingleNode("*[last()]");
+		addBreadcrumbItem(lastChildElement, breadcrumbEl);
 		DOMElement h4El = (DOMElement) autoTileElement.selectSingleNode("*");//.detach();
-		autoTileElement.insertBefore(h3El, h4El);
+		autoTileElement.insertBefore(breadcrumbEl, h4El);
 	}
 
-	private void addBreadcrumbItem(Element bookmarkElement, DOMElement h3El) {
+	private void addBreadcrumbItem(Element bookmarkElement, Element h3El) {
 		List<Element> selectChildNodes = bookmarkElement.selectNodes("*");
-		if(selectChildNodes.size() > 0)
-		{
+		if(selectChildNodes.size() > 0){
 			Element lastElement = selectChildNodes.get(selectChildNodes.size() - 1);
 			if(bookmarkElement.attribute("hasLink") == null)
 			{
 				addInnerAnchor(h3El, bookmarkElement);
 			}else{
-				h3El.addElement("span").addText(bookmarkElement.attributeValue("name"));
+				h3El.addElement("span").addText(" > " + bookmarkElement.attributeValue("name"));
 			}
-			h3El.addText(" > ");
 			addBreadcrumbItem(lastElement, h3El);
 		}else{//last in bookmark tree (null child)
 			addInnerAnchor(h3El, bookmarkElement);
 		}
 	}
 
-	private void addInnerAnchor(DOMElement h3El, Element bookmarkElement) {
+	private void addInnerAnchor(Element h3El, Element bookmarkElement) {
 		String text = bookmarkElement.attributeValue("name");
 		String bookmarkId = bookmarkElement.attribute("href").getValue().substring(1);
 		h3El.addElement("a")
 		.addAttribute("name", bookmarkId)
-		.addText(text);
+		.addText(" > " + text);
 		bookmarkElement.addAttribute("hasLink", "1");
 	}
-	private void makeBookmark(Element h234InHead, Element h234Element, String id) {
-		Element h234A_Element = (Element) h234Element.selectSingleNode("a");
-		String text = h234A_Element.getText();
-		h234InHead.addAttribute("name", text);
-		h234InHead.addAttribute("href", "#"+id);
-		h234A_Element.addAttribute("name", id);
-	}
-	
 	OutputFormat prettyPrintFormat = OutputFormat.createPrettyPrint();
 	private void writeToHtmlFile(Document document, String htmlOutFileName) {
 		try {
