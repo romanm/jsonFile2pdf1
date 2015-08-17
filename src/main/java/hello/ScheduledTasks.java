@@ -33,6 +33,7 @@ import org.dom4j.Element;
 import org.dom4j.Node;
 import org.dom4j.dom.DOMDocument;
 import org.dom4j.dom.DOMDocumentFactory;
+import org.dom4j.dom.DOMElement;
 import org.dom4j.io.DOMReader;
 import org.dom4j.io.OutputFormat;
 import org.dom4j.io.XMLWriter;
@@ -58,9 +59,9 @@ public class ScheduledTasks {
 	DOMReader domReader = new DOMReader();
 
 	//develop
-//	private static String workDir = "/home/roman/jura/workshop-manuals1991/";
+	private static String workDir = "/home/roman/jura/workshop-manuals1991/";
 	//prodaction
-	private static String workDir = "/home/holweb/jura/workshop-manuals1991/";
+//	private static String workDir = "/home/holweb/jura/workshop-manuals1991/";
 
 	String domain = "http://workshop-manuals.com";
 	private static String dirJsonName = workDir + "OUT1json/";
@@ -86,12 +87,14 @@ public class ScheduledTasks {
 		logger.debug(dirJsonName);
 		try {
 			makeLargeHTML();
-			//			makePdfFromHTML();
+			//makePdfFromHTML();
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
 	}
 
+	private Element bookmarks;
+			private int bookmarkId;
 	private void makeLargeHTML() throws IOException {
 		logger.debug("Start folder : "+dirJsonStart);
 		Files.walkFileTree(dirJsonStart, new SimpleFileVisitor<Path>() {
@@ -113,9 +116,14 @@ public class ScheduledTasks {
 
 				Element autoDocBody = createAutoDocument(autoNameWithManufacturer);
 				autoTileNr = 0;
-				addGroup(2,getIndexList(jsonMap));
+				bookmarkId = 0;
+				debugSkip = 0;
+				Element headEl = (Element) autoDocument.selectSingleNode("/html/head");
+				bookmarks = headEl.addElement("bookmarks");
+//				addGroupAndRealInfo2(2,getIndexList(jsonMap));
+				//buildBookmark(autoDocument);
 				
-				buildBookmark(autoDocument);
+				addGroupAndRealInfo(bookmarks, getIndexList(jsonMap));
 				
 				try{
 					String htmlOutFileName = dirLargeHtmlName+autoNameWithManufacturer+".html";
@@ -123,7 +131,6 @@ public class ScheduledTasks {
 				}catch(Exception e){
 					e.printStackTrace();
 				}
-
 				return visitFile;
 			}
 
@@ -131,41 +138,33 @@ public class ScheduledTasks {
 				return (List<Map<String, Object>>) jsonMap.get("indexList");
 			}
 
-			private void addGroup(int hIndex, List<Map<String, Object>> indexList) {
+			private void addGroupAndRealInfo(Element bookmarkParent, List<Map<String, Object>> indexList) {
 				if(indexList != null){
-					int numInGroup = 0;
 					for (Map<String, Object> map : indexList) {
-						numInGroup++;
-//						Element autoDocBody = (Element) autoDocument.selectSingleNode("/html/body");
 						String text = (String) map.get("text");
-						Element hElement;
-						if(hIndex>6)
-						{
-							hElement = autoDocBody.addElement("div").addAttribute("data-bookmark", "h"+hIndex);
-						}else{
-							hElement = autoDocBody.addElement("h"+hIndex).addAttribute("data-bookmark", "h"+hIndex);
-						}
-						hElement.addElement("a").addAttribute("name", "h" + hIndex + "_"+numInGroup).addText(text);
+						Element bookmarkElement = bookmarkParent.addElement("bookmark");
+						bookmarkElement.addAttribute("name", text);
+						bookmarkElement.addAttribute("href", "#b_"+bookmarkId++);
 						String url = (String) map.get("url");
-						if(url != null)
-						{
+						if(url != null){
 							addRealInfo(url);
 						}
-						
-						addGroup(hIndex+1, getIndexList(map));
+						if(debugSkip > 13)
+							break;
+						addGroupAndRealInfo(bookmarkElement, getIndexList(map));
 					}
 				}
 			}
-
-
 		});
 
 	}
 	int autoTileNr;
+	private int debugSkip;
 	private void addRealInfo(String autoTileHref) {
 		autoTileNr++;
 		Document domFromStream = getDomFromStream(autoTileHref);
-		addAutoTile(autoTileNr, "t1", domFromStream);
+//		addAutoTile(autoTileNr, "t1", domFromStream);
+		addAutoTile(domFromStream);
 	}
 	private HttpURLConnection getUrlConnection(String url) {
 		try {
@@ -237,8 +236,9 @@ public class ScheduledTasks {
 		}
 //		Element bagroundImage = (Element) autoTileElement.selectSingleNode("img[1]");
 	}
-	private String addAutoTile(int autoTileNr, String autoTileName, Document domFromStream  ) {
-		Element autoTileElement = (Element) domFromStream.selectSingleNode("/html/body//div[@id='page1-div']");
+//	private String addAutoTile(int autoTileNr, String autoTileName, Document domFromStream  ) {
+	private void addAutoTile(Document domFromStream) {
+		DOMElement autoTileElement = (DOMElement) domFromStream.selectSingleNode("/html/body//div[@id='page1-div']");
 		if(autoTileElement != null){
 			autoTileElement.attribute("id").setValue("auto_tile_"+autoTileNr);
 			changeImgUrl(autoTileElement);
@@ -247,15 +247,18 @@ public class ScheduledTasks {
 			Element autoTileElement2 = (Element) domFromStream.selectSingleNode(
 					"/html/body/div/table//td[div/h2]");
 			changeImgUrl(autoTileElement2);
+			/*
 			Element autoTileNameElement = (Element) autoTileElement2.selectSingleNode("div/h2");
 			autoTileNameElement.setText(autoTileName);
+			 * */
+			
 			/*
 			List<Element> breadcrum = autoTileElement2.selectNodes("div/h3");
 			for (Element element : breadcrum) {
 				element.detach();
 			}
 			 * */
-			autoTileElement = autoDocBody.addElement("div");
+			autoTileElement = (DOMElement) autoDocBody.addElement("div");
 			autoTileElement.addAttribute("id","auto_tile_"+autoTileNr);
 			
 			for (Iterator iterator = autoTileElement2.elementIterator(); iterator.hasNext();) {
@@ -270,10 +273,52 @@ public class ScheduledTasks {
 			String replace = element.getText().replace("‘", "'").replace("’", "'");
 			element.setText(replace);
 		}
-		Node detach = autoTileElement.detach();
-		String asXML = detach.asXML();
-		autoDocBody.add(detach);
-		return asXML;
+		addBreadcrumb(autoTileElement);
+		Element detach = (Element) autoTileElement.detach();
+		Node selectSingleNode = detach.selectSingleNode("img");
+		if(selectSingleNode != null)
+		{
+			logger.debug(selectSingleNode.asXML());
+			debugSkip++;
+			autoDocBody.add(detach);
+		}
+	}
+	private void addBreadcrumb(DOMElement autoTileElement) {
+		DOMDocument document = (DOMDocument) autoTileElement.getDocument();
+		DOMElement h3El = (DOMElement) document.createElement("div");
+		h3El.addAttribute("style", "font-weight: bold; left: 0px; position: absolute; top: 3px; font-size:x-small;");
+		//		.addElement("a").addAttribute("name", "h3_"+autoTileNr)
+		Element lastChildElement = (Element) bookmarks.selectSingleNode("*[last()]");
+		addBreadcrumbItem(lastChildElement, h3El);
+		DOMElement h4El = (DOMElement) autoTileElement.selectSingleNode("*");//.detach();
+		autoTileElement.insertBefore(h3El, h4El);
+	}
+
+	private void addBreadcrumbItem(Element bookmarkElement, DOMElement h3El) {
+		List<Element> selectChildNodes = bookmarkElement.selectNodes("*");
+		if(selectChildNodes.size() > 0)
+		{
+			Element lastElement = selectChildNodes.get(selectChildNodes.size() - 1);
+			if(bookmarkElement.attribute("hasLink") == null)
+			{
+				addInnerAnchor(h3El, bookmarkElement);
+			}else{
+				h3El.addElement("span").addText(bookmarkElement.attributeValue("name"));
+			}
+			h3El.addText(" > ");
+			addBreadcrumbItem(lastElement, h3El);
+		}else{//last in bookmark tree (null child)
+			addInnerAnchor(h3El, bookmarkElement);
+		}
+	}
+
+	private void addInnerAnchor(DOMElement h3El, Element bookmarkElement) {
+		String text = bookmarkElement.attributeValue("name");
+		String bookmarkId = bookmarkElement.attribute("href").getValue().substring(1);
+		h3El.addElement("a")
+		.addAttribute("name", bookmarkId)
+		.addText(text);
+		bookmarkElement.addAttribute("hasLink", "1");
 	}
 	private void makeBookmark(Element h234InHead, Element h234Element, String id) {
 		Element h234A_Element = (Element) h234Element.selectSingleNode("a");
@@ -282,88 +327,7 @@ public class ScheduledTasks {
 		h234InHead.addAttribute("href", "#"+id);
 		h234A_Element.addAttribute("name", id);
 	}
-	private void buildBookmark(Document autoDocument) {
-		List<Element> bookmarkEls = autoDocument.selectNodes("/html/body//*[@data-bookmark]");
-		logger.debug(""+bookmarkEls.size());
-		Element headEl = (Element) autoDocument.selectSingleNode("/html/head");
-		Element bookmarks = headEl.addElement("bookmarks")
-		,h2 = null, h3 = null, h4 = null
-		,h5 = null, h6 = null, h7 = null
-		,h8 = null, h9 = null, h10 = null;
-		int h2i = 0, h3i = 0, h4i = 0;
-		int h5i = 0, h6i = 0, h7i = 0;
-		int h8i = 0, h9i = 0, h10i = 0;
-		String h2id = null, h3id = null, h4id = null;
-		String h5id = null, h6id = null, h7id = null;
-		String h8id = null, h9id = null, h10id = null;
-		int i = 0;
-		for (Element h234Element : bookmarkEls) {
-			i++;
-			if(h234Element.attribute("data-bookmark").getValue().equals("h2"))
-			{
-				h2 = bookmarks.addElement("bookmark");
-				h2id = "bm"+h2i++;
-				makeBookmark(h2, h234Element, h2id);
-			}
-			else
-				if(h234Element.attribute("data-bookmark").getValue().equals("h3"))
-				{
-					h3 = h2.addElement("bookmark");
-					h3id = h2id + "."+h3i++;
-					makeBookmark(h3, h234Element, h3id);
-				}
-				else
-					if(h234Element.attribute("data-bookmark").getValue().equals("h4"))
-					{
-						h4 = h3.addElement("bookmark");
-						h4id = h3id + "."+h4i++;
-						makeBookmark(h4, h234Element, h4id);
-					}
-					else
-						if(h234Element.attribute("data-bookmark").getValue().equals("h5"))
-						{
-							h5 = h4.addElement("bookmark");
-							h5id = h4id + "."+h5i++;
-							makeBookmark(h5, h234Element, h5id);
-						}
-						else
-							if(h234Element.attribute("data-bookmark").getValue().equals("h6"))
-							{
-								h6 = h5.addElement("bookmark");
-								h6id = h5id + "."+h6i++;
-								makeBookmark(h6, h234Element, h6id);
-							}
-							else
-								if(h234Element.attribute("data-bookmark").getValue().equals("h7"))
-								{
-									h7 = h6.addElement("bookmark");
-									h7id = h6id + "."+h7i++;
-									makeBookmark(h7, h234Element, h7id);
-								}
-								else
-									if(h234Element.attribute("data-bookmark").getValue().equals("h8"))
-									{
-										h8 = h7.addElement("bookmark");
-										h8id = h7id + "."+h8i++;
-										makeBookmark(h8, h234Element, h8id);
-									}
-									else
-										if(h234Element.attribute("data-bookmark").getValue().equals("h9"))
-										{
-											h9 = h8.addElement("bookmark");
-											h9id = h8id + "."+h9i++;
-											makeBookmark(h9, h234Element, h9id);
-										}
-										else
-											if(h234Element.attribute("data-bookmark").getValue().equals("h10"))
-											{
-												h10 = h9.addElement("bookmark");
-												h10id = h9id + "."+h10i++;
-												makeBookmark(h10, h234Element, h10id);
-											}
-			
-		}
-	}
+	
 	OutputFormat prettyPrintFormat = OutputFormat.createPrettyPrint();
 	private void writeToHtmlFile(Document document, String htmlOutFileName) {
 		try {
