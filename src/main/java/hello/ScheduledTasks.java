@@ -56,16 +56,28 @@ public class ScheduledTasks {
 	private static final SimpleDateFormat dateFormat = new SimpleDateFormat("HH:mm:ss");
 	Tidy tidy = getTidy();
 	DOMReader domReader = new DOMReader();
-
+	private static int yearMin =  1992;
+	private static int yearMax =  1992;
 	//develop
-	private static String workDir = "/home/roman/jura/workshop-manuals1991/";
+	private static String basicDir ="/home/roman/jura/";
+	//prodaction
+//	private static String basicDir ="/home/holweb/jura/";
+	//develop
+//	private static String workDir = "/home/roman/jura/workshop-manuals1991/";
 	//prodaction
 //	private static String workDir = "/home/holweb/jura/workshop-manuals1991/";
 
+	private static String workDir = basicDir + "workshop-manuals"
+			+ yearMin
+			+ "-"
+			+ yearMax
+			+ "/";
 	String domain = "http://workshop-manuals.com";
 	private static String dirJsonName = workDir + "OUT1json/";
 	private static String dirPdfName = workDir+ "OUT1pdf/";
 	private static String dirLargeHtmlName = workDir+ "OUT1html/";
+	
+	
 	DateTime startMillis;
 	static PeriodFormatter hmsFormatter = new PeriodFormatterBuilder()
 			.appendHours().appendSuffix("h ")
@@ -81,6 +93,7 @@ public class ScheduledTasks {
 		domReader.setDocumentFactory(new DOMDocumentFactory());
 		startMillis = new DateTime();
 		System.out.println("The time is now " + dateFormat.format(startMillis.toDate()));
+		logger.debug(dirJsonStart.toString());
 		filesCount = countFiles2(dirJsonStart.toFile());
 		logger.debug("Files count " + filesCount + ". The time is now " + dateFormat.format(new Date()));
 		logger.debug(dirJsonName);
@@ -109,11 +122,20 @@ public class ScheduledTasks {
 				String manufacturerName = split[split.length-2];
 				Map<String, Object> jsonMap = readJsonDbFile2map(fileStr);
 				String autoName = (String) jsonMap.get("autoName");
-				String autoNameWithManufacturer = manufacturerName+"_-_"+autoName;
-				//				String autoNameWithManufacturer = manufacturerName+ " :: "+autoName;
+				String autoNameWithManufacturer = split[split.length-1].replace(".json", "");
+//				String autoNameWithManufacturer = manufacturerName+"_-_"+autoName;
+				String pdfTitleAutoNameWithManufacturer = manufacturerName+ " :: "+autoName;
 				logger.debug(autoNameWithManufacturer +" -- BEGIN");
-
-				Element autoDocBody = createAutoDocument(autoNameWithManufacturer);
+				
+				String htmlOutFileName2 = dirLargeHtmlName+autoNameWithManufacturer;
+				logger.debug(htmlOutFileName2);
+				File f = new File(htmlOutFileName2);
+				if(f.exists())
+				{
+					logger.debug("f.exists() --  "+htmlOutFileName2);
+					return visitFile;
+				}
+				Element autoDocBody = createAutoDocument(pdfTitleAutoNameWithManufacturer);
 				autoTileNr = 0;
 				bookmarkId = 0;
 				debugSkip = 0;
@@ -123,11 +145,11 @@ public class ScheduledTasks {
 				//buildBookmark(autoDocument);
 				
 				addGroupAndRealInfo(bookmarks, getIndexList(jsonMap));
-				logger.debug(autoNameWithManufacturer +" -- GOTO SAVE");
+				logger.debug(htmlOutFileName2 +" -- GOTO SAVE");
 				
 				try{
-					String htmlOutFileName = dirLargeHtmlName+autoNameWithManufacturer+".html";
-					saveHtml(autoDocument, htmlOutFileName);
+//					String htmlOutFileName = dirLargeHtmlName+autoNameWithManufacturer+".html";
+					saveHtml(autoDocument, htmlOutFileName2);
 				}catch(Exception e){
 					e.printStackTrace();
 				}
