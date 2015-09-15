@@ -56,12 +56,18 @@ public class ScheduledTasks {
 	private static final SimpleDateFormat dateFormat = new SimpleDateFormat("HH:mm:ss");
 	Tidy tidy = getTidy();
 	DOMReader domReader = new DOMReader();
-	private static int yearMin =  1992;
-	private static int yearMax =  1992;
+	private static int yearMin =  1995;
+	private static int yearMax =  1995;
 	//develop
-	private static String basicDir ="/home/roman/jura/";
+//	private static String basicDir ="/home/roman/jura/";
+//	private static String fileSeparator = "/";
 	//prodaction
 //	private static String basicDir ="/home/holweb/jura/";
+//	private static String fileSeparator = "/";
+	//prodaction windows
+	private static String basicDir ="d:\\home\\roman\\jura\\";
+	private static String fileSeparator = "\\";
+	
 	//develop
 //	private static String workDir = "/home/roman/jura/workshop-manuals1991/";
 	//prodaction
@@ -116,8 +122,13 @@ public class ScheduledTasks {
 					BasicFileAttributes attrs) throws IOException {
 				final FileVisitResult visitFile = super.visitFile(file, attrs);
 				fileIdx++;
-				logger.debug(fileIdx + "" + "/" + filesCount +  procentWorkTime() + file);
+				
+				logger.debug(fileIdx + "" + fileSeparator + filesCount +  procentWorkTime() + file);
+				logger.debug(fileSeparator);
 				String fileStr = file.toFile().toString();
+				logger.debug(fileStr);
+				if(fileSeparator.equals("\\"))
+					fileStr = fileStr.replace(fileSeparator, "/");
 				String[] split = fileStr.split("/");
 				String manufacturerName = split[split.length-2];
 				Map<String, Object> jsonMap = readJsonDbFile2map(fileStr);
